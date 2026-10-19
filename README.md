@@ -75,7 +75,7 @@ Example:
 ## 📂 Installation
 
 ```bash
-git clone https://github.com/amraqureshi/localhir.git
-cd localhir
+git clone https://github.com/alinabagwan/LOCALHIRE_MAIN.git
+cd LOCALHIRE_MAIN
 npm install
 npm start
