@@ -31,6 +31,10 @@ exports.createApplication = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Job ID is required' });
     }
 
+    if (!Number.isFinite(quote) || quote <= 0) {
+      return res.status(400).json({ success: false, message: 'Quote must be a valid positive number' });
+    }
+
     const jobExists = await prisma.jobPost.findUnique({ where: { id: String(jobId) } });
     if (!jobExists) {
       return res.status(404).json({ success: false, message: 'Job not found' });
@@ -154,6 +158,10 @@ exports.acceptQuote = async (req, res) => {
 
     if (!app) {
       return res.status(404).json({ success: false, message: 'Quote proposal not found' });
+    }
+
+    if (app.job.customerId !== req.user.id && req.user.role !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Only the customer who posted the job can accept quotes.' });
     }
 
     const updatedApp = await prisma.jobApplication.update({

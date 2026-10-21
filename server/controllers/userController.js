@@ -172,17 +172,65 @@ exports.getWorkers = async (req, res) => {
 // @access  Public
 exports.getWorkerById = async (req, res) => {
   try {
-    const worker = await prisma.user.findUnique({
-      where: { id: req.params.id },
-      include: {
-        workerProfile: {
-          include: {
-            primaryCategory: true,
-            skills: true
+    const rawId = req.params.id;
+    let worker = null;
+
+    try {
+      worker = await prisma.user.findUnique({
+        where: { id: rawId },
+        include: {
+          workerProfile: {
+            include: {
+              primaryCategory: true,
+              skills: true
+            }
           }
         }
+      });
+    } catch (e) {
+      // Invalid UUID format or lookup exception
+      worker = null;
+    }
+
+    // Fallback for legacy mock IDs (w1, w2, w3, etc.)
+    if (!worker || worker.role !== 'WORKER') {
+      const mockEmailMap = {
+        w1: 'electrician@localhire.dev',
+        w2: 'electrician@localhire.dev',
+        w3: 'cleaner@localhire.dev',
+        w4: 'plumber@localhire.dev',
+        w5: 'driver@localhire.dev',
+        w6: 'freelancer@localhire.dev',
+        w7: 'electrician@localhire.dev'
+      };
+      const fallbackEmail = mockEmailMap[rawId];
+      if (fallbackEmail) {
+        worker = await prisma.user.findFirst({
+          where: { email: fallbackEmail, role: 'WORKER' },
+          include: {
+            workerProfile: {
+              include: {
+                primaryCategory: true,
+                skills: true
+              }
+            }
+          }
+        });
       }
-    });
+      if (!worker && typeof rawId === 'string' && rawId.startsWith('w')) {
+        worker = await prisma.user.findFirst({
+          where: { role: 'WORKER' },
+          include: {
+            workerProfile: {
+              include: {
+                primaryCategory: true,
+                skills: true
+              }
+            }
+          }
+        });
+      }
+    }
 
     if (!worker || worker.role !== 'WORKER') {
       return res.status(404).json({ success: false, message: 'Worker profile not found' });
@@ -210,7 +258,8 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    const { category, hourlyRate, experience, phone, skills, bio, availability, lat, lng, rating, reviewsCount, location, name } = req.body;
+    const { category, hourlyRate, experience, phone, skills, bio, availability, lat, lng, location, name } = req.body;
+    // NOTE: 'rating' and 'reviewsCount' are intentionally excluded — they are managed only by reviewController.
     const userId = req.user.id;
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -236,8 +285,6 @@ exports.updateProfile = async (req, res) => {
       const match = String(experience).match(/\d+/);
       profileUpdate.experienceYears = match ? Number(match[0]) : 0;
     }
-    if (rating !== undefined) profileUpdate.rating = Number(rating);
-    if (reviewsCount !== undefined) profileUpdate.reviewsCount = Number(reviewsCount);
     if (lat !== undefined || lng !== undefined) {
       profileUpdate.latitude = lat === null || lat === '' || lat === undefined ? null : Number(lat);
       profileUpdate.longitude = lng === null || lng === '' || lng === undefined ? null : Number(lng);

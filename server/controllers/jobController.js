@@ -221,6 +221,8 @@ exports.createJob = async (req, res) => {
   }
 };
 
+const VALID_JOB_STATUSES = ['OPEN', 'QUOTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'EXPIRED'];
+
 // @desc    Update job status (e.g. Open -> In Progress -> Completed)
 // @route   PUT /api/jobs/:id/status
 // @access  Private
@@ -233,7 +235,14 @@ exports.updateJobStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Job not found' });
     }
 
+    if (existingJob.customerId !== req.user.id && req.user.role !== 'Admin') {
+      return res.status(403).json({ success: false, message: 'Only the customer who posted this job or an Admin can change its status.' });
+    }
+
     const nextStatus = status ? String(status).toUpperCase() : existingJob.status;
+    if (!VALID_JOB_STATUSES.includes(nextStatus)) {
+      return res.status(400).json({ success: false, message: `Invalid status. Valid values: ${VALID_JOB_STATUSES.join(', ')}` });
+    }
 
     const job = await prisma.jobPost.update({
       where: { id: req.params.id },

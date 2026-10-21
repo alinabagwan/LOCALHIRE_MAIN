@@ -33,7 +33,7 @@ const protect = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'localhire_super_secret_jwt_key_2026_dev');
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       const pUser = await prisma.user.findUnique({
         where: { id: String(decoded.id) }
@@ -81,7 +81,7 @@ const forbidRoles = (...forbiddenRoles) => {
     ) {
       try {
         token = req.headers.authorization.split(' ')[1];
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'localhire_super_secret_jwt_key_2026_dev');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const pUser = await prisma.user.findUnique({ where: { id: String(decoded.id) } });
         if (pUser) {
           req.user = { id: pUser.id, role: mapRole(pUser.role) };

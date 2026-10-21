@@ -1,5 +1,19 @@
 // Shared UI components and Logic
 
+// Safe HTML entity escaper to prevent Cross-Site Scripting (XSS)
+function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+if (typeof window !== 'undefined') {
+  window.escapeHTML = escapeHTML;
+}
+
 // Renders stars based on a numeric rating (0 to 5)
 function renderStars(rating) {
   const fullStars = Math.floor(rating);
@@ -36,43 +50,50 @@ function createWorkerCard(worker, relativePath = '') {
     ? worker.location
     : (worker.location && worker.location.address ? worker.location.address : 'Nearby');
 
+  const safeName = escapeHTML(worker.name || 'Worker');
+  const safeCategory = escapeHTML(worker.category || 'Professional');
+  const safeExperience = escapeHTML(worker.experience || 'Experienced');
+  const safeBio = escapeHTML(worker.bio || 'Local professional ready for hire.');
+  const safeLocation = escapeHTML(locationText);
+  const safeAvatar = worker.avatarUrl ? escapeHTML(worker.avatarUrl) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(worker.name || 'worker')}`;
+
   return `
     <div class="glass-card flex-col gap-4 animate-fade-in" style="animation-delay: ${Math.random() * 0.2}s">
       <div class="flex items-center gap-4">
-        <img src="${worker.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${worker.name}`}" alt="${worker.name}" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--primary); padding: 2px; object-fit: cover; box-shadow: 0 4px 12px rgba(94, 234, 212, 0.2);">
+        <img src="${safeAvatar}" alt="${safeName}" style="width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--primary); padding: 2px; object-fit: cover; box-shadow: 0 4px 12px rgba(94, 234, 212, 0.2);">
         <div>
-          <h3 style="margin-bottom: 0; font-family: 'DM Serif Display', serif; font-size: 1.25rem;">${worker.name}</h3>
-          <p class="text-muted" style="margin-bottom: 0.35rem; font-size: 0.85rem;">${worker.category || 'Professional'} • ${worker.experience || 'Experienced'}</p>
+          <h3 style="margin-bottom: 0; font-family: 'DM Serif Display', serif; font-size: 1.25rem;">${safeName}</h3>
+          <p class="text-muted" style="margin-bottom: 0.35rem; font-size: 0.85rem;">${safeCategory} • ${safeExperience}</p>
           <div class="flex items-center gap-1">
             ${renderStars(worker.rating || 5.0)}
-            <span style="font-size: 0.9rem; font-weight: 600; color: var(--warning); margin-left: 0.25rem;">${worker.rating || 5.0}</span>
-            <span class="text-muted" style="font-size: 0.8rem; margin-left: 0.25rem;">(${worker.reviewsCount || 0})</span>
+            <span style="font-size: 0.9rem; font-weight: 600; color: var(--warning); margin-left: 0.25rem;">${Number(worker.rating || 5.0)}</span>
+            <span class="text-muted" style="font-size: 0.8rem; margin-left: 0.25rem;">(${Number(worker.reviewsCount || 0)})</span>
           </div>
         </div>
       </div>
       
       <div class="flex flex-col gap-2">
         <p style="font-size: 0.9rem; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; flex-grow: 1;">
-          ${worker.bio || 'Local professional ready for hire.'}
+          ${safeBio}
         </p>
         <div style="font-size: 0.85rem; margin-top: 0.5rem;" class="flex items-center gap-2 text-muted">
           <svg class="icon" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          ${locationText}
+          ${safeLocation}
         </div>
       </div>
 
       <div class="flex justify-between items-center" style="margin-top: auto; padding-top: 1.25rem; border-top: 1px solid var(--border-light);">
         <div>
-           <span style="font-size: 1.35rem; font-weight: 700; color: var(--text-main); font-family: 'DM Serif Display', serif;">₹${worker.hourlyRate || 0}</span>
+           <span style="font-size: 1.35rem; font-weight: 700; color: var(--text-main); font-family: 'DM Serif Display', serif;">₹${Number(worker.hourlyRate || 0)}</span>
            <span class="text-muted" style="font-size: 0.85rem;">/hr</span>
         </div>
         <div class="flex gap-2">
            ${currentUser && currentUser.role === 'Customer' ? `
-           <button class="btn btn-outline fav-card-btn" data-worker-id="${workerId}" style="padding: 0.5rem; ${isFav ? 'color: var(--danger); border-color: var(--danger);' : ''}" title="Save to Favorites">
+           <button class="btn btn-outline fav-card-btn" data-worker-id="${escapeHTML(workerId)}" style="padding: 0.5rem; ${isFav ? 'color: var(--danger); border-color: var(--danger);' : ''}" title="Save to Favorites">
                 <svg class="icon" viewBox="0 0 24 24" style="${isFav ? 'fill: currentColor; stroke: none;' : ''}"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
            </button>
            ` : ''}
-           <a href="${prefix}profile.html?id=${workerId}" class="btn btn-primary" style="padding: 0.6rem 1.5rem; border-radius: 9999px;">Hire</a>
+           <a href="${prefix}profile.html?id=${encodeURIComponent(workerId)}" class="btn btn-primary" style="padding: 0.6rem 1.5rem; border-radius: 9999px;">Hire</a>
         </div>
       </div>
     </div>
@@ -112,32 +133,40 @@ function createJobCard(job) {
     ? job.location
     : (job.location && job.location.address ? job.location.address : 'Local area');
 
+  const safeTitle = escapeHTML(job.title || 'Untitled Job');
+  const safeStatus = escapeHTML(job.status || 'Open');
+  const safeUrgency = escapeHTML(job.urgency || '');
+  const safeDescription = escapeHTML(job.description || '');
+  const safeCustomer = escapeHTML(job.customerName || 'Client');
+  const safeLocation = escapeHTML(locationText);
+  const safeBudget = escapeHTML(job.budget || 'Flexible');
+
   return `
     <div class="glass-card flex-col gap-4 animate-fade-in" style="animation-delay: ${Math.random() * 0.2}s">
       <div class="flex justify-between items-start">
-        <h4 style="margin: 0; color: var(--primary); font-size: 1.1rem; padding-right: 1rem;">${job.title}</h4>
+        <h4 style="margin: 0; color: var(--primary); font-size: 1.1rem; padding-right: 1rem;">${safeTitle}</h4>
         <div class="flex flex-col gap-1 items-end">
-          <span class="badge ${job.status === 'Open' ? 'badge-primary' : ''}" style="white-space: nowrap;">${job.status}</span>
-          ${job.urgency ? `<span class="badge" style="background: var(--surface-light); color: var(--text-main); font-size: 0.75rem; border: 1px solid var(--border-light);"><svg class="icon" style="width: 12px; height: 12px; display: inline; margin-right: 4px; vertical-align: text-bottom;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${job.urgency}</span>` : ''}
+          <span class="badge ${job.status === 'Open' ? 'badge-primary' : ''}" style="white-space: nowrap;">${safeStatus}</span>
+          ${safeUrgency ? `<span class="badge" style="background: var(--surface-light); color: var(--text-main); font-size: 0.75rem; border: 1px solid var(--border-light);"><svg class="icon" style="width: 12px; height: 12px; display: inline; margin-right: 4px; vertical-align: text-bottom;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>${safeUrgency}</span>` : ''}
         </div>
       </div>
       
       <p style="font-size: 0.9rem; color: var(--text-muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;">
-        ${job.description}
+        ${safeDescription}
       </p>
 
       <div class="flex flex-col gap-2" style="font-size: 0.85rem; padding-top: 0.5rem;">
         <div class="flex items-center gap-2">
           <svg class="icon text-muted" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          <span>Posted by ${job.customerName || 'Client'}</span>
+          <span>Posted by ${safeCustomer}</span>
         </div>
         <div class="flex items-center gap-2">
           <svg class="icon text-muted" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          <span>${locationText}</span>
+          <span>${safeLocation}</span>
         </div>
         <div class="flex items-center gap-2">
           <svg class="icon text-muted" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          <span style="font-weight: 600;">Budget: ${job.budget}</span>
+          <span style="font-weight: 600;">Budget: ${safeBudget}</span>
         </div>
       </div>
     </div>

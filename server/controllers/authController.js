@@ -41,7 +41,7 @@ const serializeUser = (user) => ({
 
 // Helper to sign JWT Token
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'localhire_super_secret_jwt_key_2026_dev', {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '30d'
   });
 };

@@ -396,6 +396,11 @@ window.localHireAPI = {
       }
       if (res.ok) {
         const data = await res.json();
+        if (data.workers && data.workers.length > 0 && typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('localHire_users', JSON.stringify(data.workers));
+          } catch (e) {}
+        }
         return data.workers;
       }
     } catch (err) {
@@ -856,44 +861,83 @@ window.localHireAPI = {
 
   // Escrow & Milestone Payment API Services
   escrow: {
-    fundEscrow: async (jobId, workerId, amount, paymentMethod) => {
+    getStatus: async () => {
       try {
+        const res = await fetch(`${API_BASE_URL}/escrow/status`);
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (err) {
+        console.warn('[API Client] Server offline for getStatus');
+      }
+      return { success: false, mode: 'UNAVAILABLE' };
+    },
+
+    fundEscrow: async (jobIdOrBookingId, workerId, amount, paymentMethod, isBooking = false) => {
+      try {
+        const payload = isBooking
+          ? { bookingId: jobIdOrBookingId, workerId, amount, paymentMethod }
+          : { jobId: jobIdOrBookingId, workerId, amount, paymentMethod };
         const res = await fetch(`${API_BASE_URL}/escrow/fund`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ jobId, workerId, amount, paymentMethod })
+          body: JSON.stringify(payload)
         });
-        if (res.ok) {
-          const data = await res.json();
+        const data = await res.json().catch(() => null);
+        if (res.ok && data) {
           return data;
         }
+        return { success: false, message: data?.message || 'Funding escrow failed' };
       } catch (err) {
-        console.warn('[API Client] Server offline for fundEscrow, using local mode');
+        console.warn('[API Client] Server offline for fundEscrow');
       }
-      return { success: false };
+      return { success: false, message: 'Unable to reach the LocalHire escrow server.' };
     },
 
-    releaseEscrow: async (jobId) => {
+    releaseEscrow: async (jobIdOrBookingId, isBooking = false, paymentMethod = 'UPI') => {
       try {
+        const payload = isBooking
+          ? { bookingId: jobIdOrBookingId, paymentMethod }
+          : { jobId: jobIdOrBookingId, paymentMethod };
         const res = await fetch(`${API_BASE_URL}/escrow/release`, {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ jobId })
+          body: JSON.stringify(payload)
         });
         const data = await res.json().catch(() => null);
-
-        if (res.ok) {
-          return data || { success: true };
+        if (res.ok && data) {
+          return data;
         }
-
         return {
           success: false,
           message: data?.message || 'Escrow release failed'
         };
       } catch (err) {
-        console.warn('[API Client] Server offline for releaseEscrow, using local mode');
+        console.warn('[API Client] Server offline for releaseEscrow');
       }
-      return { success: false, message: 'Escrow release failed' };
+      return { success: false, message: 'Unable to reach the LocalHire escrow server.' };
+    },
+
+    disputeEscrow: async (jobIdOrBookingId, reason, isBooking = false) => {
+      try {
+        const payload = isBooking ? { bookingId: jobIdOrBookingId, reason } : { jobId: jobIdOrBookingId, reason };
+        const res = await fetch(`${API_BASE_URL}/escrow/dispute`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data) {
+          return data;
+        }
+        return {
+          success: false,
+          message: data?.message || 'Escrow dispute failed'
+        };
+      } catch (err) {
+        console.warn('[API Client] Server offline for disputeEscrow');
+      }
+      return { success: false, message: 'Unable to reach the LocalHire escrow server.' };
     },
 
     getJobEscrow: async (jobId) => {
@@ -907,6 +951,21 @@ window.localHireAPI = {
         }
       } catch (err) {
         console.warn('[API Client] Server offline for getJobEscrow');
+      }
+      return null;
+    },
+
+    getBookingEscrow: async (bookingId) => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/escrow/booking/${bookingId}`, {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.escrow;
+        }
+      } catch (err) {
+        console.warn('[API Client] Server offline for getBookingEscrow');
       }
       return null;
     },

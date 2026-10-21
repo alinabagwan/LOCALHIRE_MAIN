@@ -10,6 +10,20 @@ const { ensureAuthorizedChatParticipants } = require('./controllers/chatControll
 
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
+// ─── Startup environment guard ────────────────────────────────────────────────
+if (!process.env.JWT_SECRET) {
+  console.error('[FATAL] JWT_SECRET environment variable is not set.');
+  console.error('[FATAL] Set it in server/.env before starting the server.');
+  console.error('[FATAL] Generate a safe value: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  process.exit(1);
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error('[FATAL] DATABASE_URL environment variable is not set.');
+  process.exit(1);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 const connectDB = require('./config/db');
 
 // Import Routes
@@ -120,17 +134,48 @@ const verifyBookingTrackingAccess = async ({ bookingId, userId, role }) => {
 
 // Middleware
 app.use(express.json());
-app.use(cors({
-  origin: '*', // Allow all origins for dev / local testing
-  methods: ['GET', 'POST', 'PUT', 'DELETE']
-}));
+
+const parseAllowedOrigins = () => {
+  const envOrigins = (process.env.ALLOWED_ORIGIN || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return new Set([
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    ...envOrigins
+  ]);
+};
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. mobile apps, curl, or file:// where origin is 'null')
+    if (!origin || origin === 'null') {
+      return callback(null, true);
+    }
+    const allowed = parseAllowedOrigins();
+    if (allowed.has(origin)) {
+      return callback(null, true);
+    }
+    // In development mode, allow any local port on localhost / 127.0.0.1
+    if (process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+};
+
+app.use(cors(corsOptions));
 
 // Socket.io initialization
 const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+  cors: corsOptions
 });
 
 io.use(async (socket, next) => {
@@ -144,7 +189,7 @@ io.use(async (socket, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'localhire_super_secret_jwt_key_2026_dev');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({
       where: { id: String(decoded.id) },
       select: { id: true, role: true }
@@ -280,14 +325,35 @@ io.on('connection', (socket) => {
     socket.data.trackingRoom = room;
 
     const liveState = activeTracking.get(bookingId);
+    let initialLocation = liveState?.lastLocation || null;
+
+    if (!initialLocation && booking?.workerId) {
+      try {
+        const wp = await prisma.workerProfile.findUnique({
+          where: { userId: String(booking.workerId) },
+          select: { latitude: true, longitude: true }
+        });
+        if (wp && wp.latitude != null && wp.longitude != null) {
+          initialLocation = {
+            latitude: Number(wp.latitude),
+            longitude: Number(wp.longitude),
+            accuracy: 50,
+            timestamp: new Date().toISOString()
+          };
+        }
+      } catch (err) {
+        console.warn('[Socket Tracking] WorkerProfile location lookup failed:', err.message);
+      }
+    }
+
     socket.emit('tracking:state', {
       bookingId,
       active: !!liveState,
       workerId: liveState?.workerId || booking.workerId,
       customerId: liveState?.customerId || booking.customerId,
-      lastLocation: liveState?.lastLocation || null,
+      lastLocation: initialLocation,
       startedAt: liveState?.startedAt || null,
-      message: liveState ? 'Tracking is active.' : 'Tracking has not started for this booking yet.'
+      message: liveState ? 'Tracking is active.' : (initialLocation ? 'Worker base location found. Live updates will follow when worker departs.' : 'Tracking has not started for this booking yet.')
     });
   });
 

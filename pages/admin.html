@@ -130,6 +130,13 @@
         document.addEventListener('DOMContentLoaded', () => {
             renderNavbar('navbar-container', 'pages');
 
+            const currentUser = window.localHireApp ? window.localHireApp.getCurrentUser() : null;
+            if (!currentUser || currentUser.role !== 'Admin') {
+                alert('Access denied. Administrator privileges required.');
+                window.location.href = '../index.html';
+                return;
+            }
+
             const users = window.localHireApp.getUsers();
             const jobs = window.localHireApp.getJobs();
 
@@ -142,11 +149,11 @@
             users.forEach(u => {
                 usersTbody.innerHTML += `
                     <tr>
-                        <td><strong>${u.name}</strong></td>
-                        <td>${u.email}</td>
-                        <td><span class="badge ${u.role === 'Worker' ? 'badge-primary' : ''}">${u.role}</span></td>
-                        <td>${u.category || 'N/A'}</td>
-                        <td>${u.rating ? u.rating + '★' : 'N/A'}</td>
+                        <td><strong>${escapeHTML(u.name)}</strong></td>
+                        <td>${escapeHTML(u.email)}</td>
+                        <td><span class="badge ${u.role === 'Worker' ? 'badge-primary' : ''}">${escapeHTML(u.role)}</span></td>
+                        <td>${escapeHTML(u.category || 'N/A')}</td>
+                        <td>${u.rating ? escapeHTML(u.rating) + '★' : 'N/A'}</td>
                         <td>
                             <button class="btn btn-outline" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;" onclick="alert('User status updated')">Verify</button>
                         </td>
@@ -159,11 +166,11 @@
             jobs.forEach(j => {
                 jobsTbody.innerHTML += `
                     <tr>
-                        <td><strong>${j.title}</strong></td>
-                        <td>${j.category}</td>
-                        <td>${j.customerName}</td>
-                        <td>${j.budget}</td>
-                        <td><span class="badge badge-primary">${j.status}</span></td>
+                        <td><strong>${escapeHTML(j.title)}</strong></td>
+                        <td>${escapeHTML(j.category)}</td>
+                        <td>${escapeHTML(j.customerName)}</td>
+                        <td>${escapeHTML(j.budget)}</td>
+                        <td><span class="badge badge-primary">${escapeHTML(j.status)}</span></td>
                         <td>
                             <button class="btn btn-outline" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; color: var(--danger); border-color: var(--danger);" onclick="alert('Job flagged for review')">Flag</button>
                         </td>

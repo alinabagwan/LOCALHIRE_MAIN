@@ -6,6 +6,8 @@
     <title>My Jobs | LocalHire</title>
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/escrow.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -83,6 +85,7 @@
             }
 
             const trackingSockets = new Map();
+            const trackingMaps = new Map(); // Leaflet map instances keyed by bookingId
 
             function updateTrackingCard(bookingId, text, badgeText = 'Live') {
                 const statusEl = document.querySelector(`[data-tracking-status="${bookingId}"]`);
@@ -92,6 +95,28 @@
                     badgeEl.textContent = badgeText;
                     badgeEl.style.background = badgeText === 'Live' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(148, 163, 184, 0.12)';
                     badgeEl.style.color = badgeText === 'Live' ? '#4ade80' : 'var(--text-muted)';
+                }
+            }
+
+            function updateTrackingMap(bookingId, lat, lng, workerLabel = 'Worker') {
+                const mapContainer = document.getElementById(`tracking-map-${bookingId}`);
+                if (!mapContainer || !window.L) return;
+                mapContainer.style.display = 'block';
+
+                let mapData = trackingMaps.get(bookingId);
+                if (!mapData) {
+                    const map = L.map(mapContainer).setView([lat, lng], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(map);
+                    const marker = L.marker([lat, lng]).addTo(map)
+                        .bindPopup(`📍 <b>${escapeHTML(workerLabel)}</b><br>Live GPS Location`)
+                        .openPopup();
+                    trackingMaps.set(bookingId, { map, marker });
+                    setTimeout(() => map.invalidateSize(), 200);
+                } else {
+                    mapData.marker.setLatLng([lat, lng]);
+                    mapData.map.panTo([lat, lng]);
                 }
             }
 
@@ -122,10 +147,17 @@
             function createBookingCard(booking, role) {
                 const isWorker = role === 'Worker';
                 const otherPerson = isWorker ? booking.customer : booking.worker;
-                const otherName = otherPerson ? otherPerson.name : (isWorker ? 'Customer' : 'Professional');
-                const otherAvatar = otherPerson && otherPerson.avatarUrl ? otherPerson.avatarUrl : `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherName}`;
-                const scheduledDate = new Date(booking.scheduledAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                const isTrackingStatus = booking.status === 'IN_PROGRESS' || booking.status === 'DISPATCHED';
+                const rawName = otherPerson ? otherPerson.name : (isWorker ? 'Customer' : 'Professional');
+                const otherName = escapeHTML(rawName);
+                const otherAvatar = otherPerson && otherPerson.avatarUrl ? escapeHTML(otherPerson.avatarUrl) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(rawName)}`;
+                const scheduledDate = escapeHTML(new Date(booking.scheduledAt).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }));
+                const isTrackingStatus = ['CONFIRMED', 'DISPATCHED', 'IN_PROGRESS'].includes(booking.status);
+                const safeBookingNumber = escapeHTML(booking.bookingNumber || 'BK-DIRECT');
+                const safeTimeSlot = escapeHTML(booking.timeSlot || 'Flexible');
+                const safeAgreedPrice = Number(booking.agreedPrice || 0);
+                const safeSubtitle = isWorker
+                    ? (booking.customer && booking.customer.email ? escapeHTML(booking.customer.email) : 'Verified Customer')
+                    : (booking.worker && booking.worker.category ? escapeHTML(booking.worker.category) : 'Service Professional');
                 
                 let badgeClass = 'badge';
                 let statusLabel = booking.status;
@@ -184,6 +216,26 @@
                                 <div class="text-muted" style="font-size: 0.8rem; text-align: center;">Awaiting customer confirmation</div>
                             </div>
                         `;
+                    } else if (booking.status === 'COMPLETED') {
+                        const isPaid = booking.payment && booking.payment.status === 'RELEASED_TO_WORKER';
+                        if (isPaid) {
+                            const methodLabel = booking.payment.paymentMethod === 'CASH_ON_DELIVERY' ? 'Cash' : (booking.payment.paymentMethod || 'UPI');
+                            actionButtons = `
+                                <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 0.75rem;">
+                                    <div class="escrow-badge escrow-released" style="width: 100%; text-align: center; justify-content: center; padding: 0.5rem; font-size: 0.82rem;">
+                                        💰 Payment Received: ₹${booking.payment.totalAmount} via ${methodLabel}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            actionButtons = `
+                                <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 0.75rem;">
+                                    <div class="escrow-badge escrow-held" style="width: 100%; text-align: center; justify-content: center; padding: 0.5rem; font-size: 0.82rem;">
+                                        ⏳ Service Complete — Awaiting Customer Escrow Release
+                                    </div>
+                                </div>
+                            `;
+                        }
                     }
                 } else {
                     if (booking.status === 'REQUESTED' || booking.status === 'CONFIRMED' || booking.status === 'DISPATCHED') {
@@ -195,13 +247,50 @@
                             </div>
                         `;
                     } else if (booking.status === 'IN_PROGRESS') {
+                        const wName = escapeHTML(booking.worker ? (booking.worker.name || 'Worker') : 'Worker');
+                        const wAmount = Number(booking.agreedPrice || 0);
                         actionButtons = `
-                            <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 1rem; text-align: right;">
-                                <button class="btn btn-primary btn-booking-action" data-booking-id="${booking.id}" data-action="COMPLETED" style="padding: 0.45rem 1rem; font-size: 0.8rem;">
-                                    Confirm Completion
+                            <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                <div class="escrow-badge escrow-held" style="align-self: flex-start; font-size: 0.8rem;">🔔 Service in progress / Worker on-site</div>
+                                <button class="btn btn-primary btn-release-escrow"
+                                    data-booking-id="${booking.id}"
+                                    data-worker-name="${wName}"
+                                    data-amount="${wAmount}"
+                                    style="width: 100%; padding: 0.6rem 1rem; font-size: 0.9rem; background: #22c55e; border-color: #22c55e; font-weight: 600;">
+                                    ✅ Approve &amp; Release Payment (UPI / Cash)
+                                </button>
+                                <button class="btn btn-outline btn-booking-action" data-booking-id="${booking.id}" data-action="CANCELLED" style="padding: 0.45rem 1rem; font-size: 0.8rem; color: var(--danger); border-color: var(--danger);">
+                                    Dispute / Cancel
                                 </button>
                             </div>
                         `;
+                    } else if (booking.status === 'COMPLETED') {
+                        const wName = escapeHTML(booking.worker ? (booking.worker.name || 'Worker') : 'Worker');
+                        const wAmount = Number(booking.agreedPrice || 0);
+                        const isPaid = booking.payment && booking.payment.status === 'RELEASED_TO_WORKER';
+                        if (isPaid) {
+                            const methodLabel = booking.payment.paymentMethod === 'CASH_ON_DELIVERY' ? 'Cash' : (booking.payment.paymentMethod || 'UPI');
+                            actionButtons = `
+                                <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 0.75rem;">
+                                    <div class="escrow-badge escrow-released" style="width: 100%; text-align: center; justify-content: center; padding: 0.5rem; font-size: 0.82rem;">
+                                        ✅ Payment Released (₹${booking.payment.totalAmount} via ${methodLabel})
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            actionButtons = `
+                                <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                                    <div class="escrow-badge escrow-held" style="align-self: flex-start; font-size: 0.8rem;">🔔 Service Completed — Release Escrow Payment</div>
+                                    <button class="btn btn-primary btn-release-escrow"
+                                        data-booking-id="${booking.id}"
+                                        data-worker-name="${wName}"
+                                        data-amount="${wAmount}"
+                                        style="width: 100%; padding: 0.6rem 1rem; font-size: 0.9rem; background: #22c55e; border-color: #22c55e; font-weight: 600;">
+                                        💸 Release Payment to Worker (UPI / Cash)
+                                    </button>
+                                </div>
+                            `;
+                        }
                     }
                 }
 
@@ -211,6 +300,7 @@
                             <span class="text-muted" style="font-size: 0.8rem;">Live GPS</span>
                             <span class="badge" data-tracking-badge="${booking.id}" style="font-size: 0.72rem;">Waiting</span>
                         </div>
+                        <div id="tracking-map-${booking.id}" style="width: 100%; height: 200px; border-radius: 8px; display: none; margin-bottom: 0.5rem; border: 1px solid var(--border-light);"></div>
                         <div class="text-muted" data-tracking-status="${booking.id}" style="font-size: 0.8rem; line-height: 1.5; min-height: 1.5em;">
                             ${isWorker ? 'Start live sharing when you are on-site.' : 'Waiting for the worker to share a live location.'}
                         </div>
@@ -224,7 +314,7 @@
                     <div class="glass-card flex-col gap-4 animate-fade-in" style="border: 1px solid var(--border-light);">
                         <div class="flex justify-between items-start">
                             <div>
-                                <span style="font-family: monospace; font-size: 0.8rem; color: var(--primary); font-weight: 700;">${booking.bookingNumber || 'BK-DIRECT'}</span>
+                                <span style="font-family: monospace; font-size: 0.8rem; color: var(--primary); font-weight: 700;">${safeBookingNumber}</span>
                                 <h4 style="margin: 0.25rem 0 0 0; font-size: 1.1rem; color: var(--text-main);">${isWorker ? 'Booking from ' + otherName : 'Hired ' + otherName}</h4>
                             </div>
                             <span class="${badgeClass}" style="white-space: nowrap;">${statusLabel}</span>
@@ -234,18 +324,18 @@
                             <img src="${otherAvatar}" style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--primary); object-fit: cover;">
                             <div style="font-size: 0.85rem; line-height: 1.4;">
                                 <strong style="color: var(--text-main); display: block;">${otherName}</strong>
-                                <span class="text-muted">${isWorker ? (booking.customer && booking.customer.email ? booking.customer.email : 'Verified Customer') : (booking.worker && booking.worker.category ? booking.worker.category : 'Service Professional')}</span>
+                                <span class="text-muted">${safeSubtitle}</span>
                             </div>
                         </div>
 
                         <div class="flex flex-col gap-2" style="font-size: 0.85rem; background: rgba(0,0,0,0.03); padding: 0.75rem; border-radius: 8px;">
                             <div class="flex items-center gap-2 text-muted">
                                 <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                                <span><strong>Date:</strong> ${scheduledDate} (${booking.timeSlot || 'Flexible'})</span>
+                                <span><strong>Date:</strong> ${scheduledDate} (${safeTimeSlot})</span>
                             </div>
                             <div class="flex items-center gap-2 text-muted">
                                 <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                                <span><strong>Agreed Rate:</strong> <strong style="color: var(--text-main);">₹${booking.agreedPrice}</strong></span>
+                                <span><strong>Agreed Rate:</strong> <strong style="color: var(--text-main);">₹${safeAgreedPrice}</strong></span>
                             </div>
                         </div>
 
@@ -311,12 +401,35 @@
 
                     const updateRes = await window.localHireAPI.updateBookingStatus(bookingId, targetStatus);
                     if (updateRes && updateRes.success) {
-                        alert(`✅ Booking status updated to ${targetStatus}!`);
+                        const msg = targetStatus === 'COMPLETED'
+                            ? '✅ Service marked as complete! The customer will now be notified to confirm and release payment.'
+                            : `✅ Booking status updated to ${targetStatus}!`;
+                        alert(msg);
                         window.location.reload();
                     } else {
                         alert(`❌ Could not update booking status: ${updateRes ? updateRes.message : 'Database unavailable'}`);
                         actionBtn.disabled = false;
                     }
+                }
+
+                // Customer "Approve & Release Payment" button — opens UPI/Cash escrow release modal
+                const releaseBtn = e.target.closest('.btn-release-escrow');
+                if (releaseBtn) {
+                    const bookingId = releaseBtn.getAttribute('data-booking-id');
+                    const workerName = releaseBtn.getAttribute('data-worker-name');
+                    const amount = releaseBtn.getAttribute('data-amount');
+                    if (window.LocalHireEscrow && window.LocalHireEscrow.openReleaseModal) {
+                        window.LocalHireEscrow.openReleaseModal(bookingId, workerName, amount, true, (success, msg) => {
+                            if (success) {
+                                window.location.reload();
+                            } else {
+                                alert(msg || 'Could not release payment. Please try again.');
+                            }
+                        });
+                    } else {
+                        alert('Escrow module not loaded. Please refresh the page.');
+                    }
+                    return;
                 }
 
                 const trackingBtn = e.target.closest('.tracking-action-btn');
@@ -327,13 +440,17 @@
                     const socket = window.localHireAPI && window.localHireAPI.tracking ? window.localHireAPI.tracking.connect(bookingId, {
                         onState: (payload) => {
                             if (payload && payload.bookingId === bookingId) {
-                                const activeText = payload.active ? 'Tracking active' : 'Tracking not active';
-                                updateTrackingCard(bookingId, payload.message || activeText, payload.active ? 'Live' : 'Waiting');
+                                const activeText = payload.active ? 'Tracking active' : (payload.lastLocation ? 'Worker location located' : 'Tracking not active');
+                                updateTrackingCard(bookingId, payload.message || activeText, payload.active ? 'Live' : (payload.lastLocation ? 'Located' : 'Waiting'));
+                                if (payload.lastLocation && payload.lastLocation.latitude && payload.lastLocation.longitude) {
+                                    updateTrackingMap(bookingId, payload.lastLocation.latitude, payload.lastLocation.longitude);
+                                }
                             }
                         },
                         onLocation: (payload) => {
                             if (payload && payload.bookingId === bookingId && payload.location) {
                                 updateTrackingCard(bookingId, `Worker is at ${payload.location.latitude.toFixed(5)}, ${payload.location.longitude.toFixed(5)} (${payload.location.accuracy ? Math.round(payload.location.accuracy) + 'm accuracy' : 'live'})`, 'Live');
+                                updateTrackingMap(bookingId, payload.location.latitude, payload.location.longitude);
                             }
                         },
                         onStopped: (payload) => {
@@ -363,6 +480,7 @@
                                 onLocation: (locPayload) => {
                                     if (locPayload && locPayload.bookingId === bookingId) {
                                         window.localHireAPI.tracking.updateLocation(bookingId, locPayload.latitude, locPayload.longitude, locPayload.accuracy || null);
+                                        updateTrackingMap(bookingId, locPayload.latitude, locPayload.longitude, 'You (Worker)');
                                     }
                                 },
                                 onError: (errorPayload) => {
@@ -422,6 +540,20 @@
                     viewMyJobs.innerHTML += createBookingCard(booking, user.role);
                 });
 
+                // Auto-subscribe tracking for customer so worker GPS map loads immediately while waiting
+                if (user.role === 'Customer') {
+                    setTimeout(() => {
+                        myBookings.forEach(booking => {
+                            if (['CONFIRMED', 'DISPATCHED', 'IN_PROGRESS'].includes(booking.status)) {
+                                const btn = document.querySelector(`.tracking-action-btn[data-booking-id="${booking.id}"]`);
+                                if (btn && btn.getAttribute('data-mode') === 'subscribe') {
+                                    btn.click();
+                                }
+                            }
+                        });
+                    }, 400);
+                }
+
                 // 2. Render Jobs (Job posts or assigned jobs)
                 const jobsWithQuoteCounts = await Promise.all(myJobs.map(async (job) => {
                     let appCount = 0;
@@ -451,7 +583,7 @@
                             actionHtml = `
                                 <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
                                     <span class="escrow-badge escrow-held" style="align-self: flex-start;">🔒 Payment Locked in Escrow</span>
-                                    <button class="btn btn-primary release-escrow-btn" style="width: 100%; font-size: 0.85rem;" onclick="window.LocalHireEscrow.releasePayment('${job.id}')">
+                                    <button class="btn btn-primary release-escrow-btn" style="width: 100%; font-size: 0.85rem;" onclick="window.LocalHireEscrow.releasePayment('${encodeURIComponent(job.id)}')">
                                         Release Payment & Complete Job
                                     </button>
                                 </div>
@@ -459,7 +591,7 @@
                         } else {
                             actionHtml = `
                                 <div style="margin-top: 1rem; border-top: 1px dashed var(--border-light); padding-top: 1rem;">
-                                    <button class="btn btn-outline view-quotes-btn" style="width: 100%; border-color: var(--primary); color: var(--primary);" data-job-id="${job.id}" data-job-title="${job.title}">
+                                    <button class="btn btn-outline view-quotes-btn" style="width: 100%; border-color: var(--primary); color: var(--primary);" data-job-id="${encodeURIComponent(job.id)}" data-job-title="${escapeHTML(job.title)}">
                                         View Quotes (${appCount})
                                     </button>
                                 </div>
@@ -520,24 +652,30 @@
                             modalList.innerHTML = `<p class="text-muted" style="text-align: center; padding: 2rem;">No quotes received yet.</p>`;
                         } else {
                             apps.forEach(app => {
+                                const safeWorkerName = escapeHTML(app.workerName || 'Worker');
+                                const safeWorkerAvatar = app.workerAvatar ? escapeHTML(app.workerAvatar) : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(app.workerName || 'worker')}`;
+                                const safeMessage = escapeHTML(app.message || '');
+                                const safeStatus = escapeHTML(app.status || 'Pending');
+                                const safeQuote = Number(app.quote || 0);
+
                                 modalList.innerHTML += `
                                     <div class="glass-card" style="padding: 1.5rem; background: var(--surface-light); border: 1px solid var(--border-light);">
                                         <div class="flex justify-between items-start" style="margin-bottom: 1rem;">
                                             <div class="flex items-center gap-3">
-                                                <img src="${app.workerAvatar || ''}" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--primary);">
+                                                <img src="${safeWorkerAvatar}" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--primary);">
                                                 <div>
-                                                    <h4 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">${app.workerName || 'Worker'}</h4>
-                                                    <a href="profile.html?id=${app.workerId}" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">View Profile</a>
+                                                    <h4 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">${safeWorkerName}</h4>
+                                                    <a href="profile.html?id=${encodeURIComponent(app.workerId)}" style="font-size: 0.8rem; color: var(--primary); text-decoration: none;">View Profile</a>
                                                 </div>
                                             </div>
                                             <div class="flex flex-col items-end">
-                                                <span style="font-size: 1.2rem; font-weight: bold; color: var(--secondary);">${app.quote}</span>
-                                                <span class="badge" style="margin-top: 0.25rem;">${app.status || 'Pending'}</span>
+                                                <span style="font-size: 1.2rem; font-weight: bold; color: var(--secondary);">₹${safeQuote}</span>
+                                                <span class="badge" style="margin-top: 0.25rem;">${safeStatus}</span>
                                             </div>
                                         </div>
-                                        <p style="font-size: 0.95rem; margin: 0; color: var(--text-main); padding: 1rem; background: rgba(0,0,0,0.05); border-radius: 8px;">"${app.message}"</p>
+                                        <p style="font-size: 0.95rem; margin: 0; color: var(--text-main); padding: 1rem; background: rgba(0,0,0,0.05); border-radius: 8px;">"${safeMessage}"</p>
                                         <div style="margin-top: 1rem; text-align: right;">
-                                            <button class="btn btn-primary accept-quote-btn" data-app-id="${app.id}" data-job-id="${jobId}" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">
+                                            <button class="btn btn-primary accept-quote-btn" data-app-id="${encodeURIComponent(app.id)}" data-job-id="${encodeURIComponent(jobId)}" style="padding: 0.5rem 1.25rem; font-size: 0.85rem;">
                                                 Accept Quote & Hire
                                             </button>
                                         </div>
