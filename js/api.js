@@ -983,6 +983,79 @@ window.localHireAPI = {
         console.warn('[API Client] Server offline for getUserLedger');
       }
       return [];
+    },
+
+    getAdminEscrows: async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/escrows`, {
+          headers: getAuthHeaders()
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return data.escrows || [];
+        }
+      } catch (err) {
+        console.warn('[API Client] Server offline for getAdminEscrows, falling back to local records');
+      }
+      const local = JSON.parse(localStorage.getItem('localHire_escrows') || '[]');
+      return local;
+    },
+
+    adminReleaseEscrow: async (bookingIdOrPaymentId, isBooking = true) => {
+      try {
+        const payload = isBooking ? { bookingId: bookingIdOrPaymentId } : { jobId: bookingIdOrPaymentId };
+        const res = await fetch(`${API_BASE_URL}/escrow/release`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data) {
+          return data;
+        }
+        return { success: false, message: data?.message || 'Admin release failed' };
+      } catch (err) {
+        console.warn('[API Client] Server offline for adminReleaseEscrow');
+      }
+      return { success: false, message: 'Server connection failed.' };
+    },
+
+    adminResolveDispute: async (escrowId, action, reason = '') => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/escrows/resolve`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ escrowId, action, reason })
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data) {
+          return data;
+        }
+        return { success: false, message: data?.message || 'Dispute resolution failed' };
+      } catch (err) {
+        console.warn('[API Client] Server offline for adminResolveDispute');
+      }
+      return { success: false, message: 'Server connection failed.' };
+    },
+
+    updateWorkerUpi: async (upiId) => {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('localHire_worker_upi', upiId);
+        }
+        const res = await fetch(`${API_BASE_URL}/users/profile`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ upiId, licenseNumber: upiId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          return { success: true, user: data.user };
+        }
+      } catch (err) {
+        console.warn('[API Client] Server offline, updated worker UPI in local storage');
+      }
+      return { success: true, localOnly: true };
     }
   }
 };

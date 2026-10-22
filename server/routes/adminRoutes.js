@@ -4,7 +4,9 @@ const {
   getMetrics,
   getAllUsers,
   deleteUser,
-  deleteJob
+  deleteJob,
+  getAllEscrows,
+  resolveDispute
 } = require('../controllers/adminController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
@@ -16,5 +18,7 @@ router.get('/metrics', getMetrics);
 router.get('/users', getAllUsers);
 router.delete('/users/:id', deleteUser);
 router.delete('/jobs/:id', deleteJob);
+router.get('/escrows', getAllEscrows);
+router.post('/escrows/resolve', resolveDispute);
 
 module.exports = router;

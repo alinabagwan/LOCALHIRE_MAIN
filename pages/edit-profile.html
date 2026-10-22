@@ -69,6 +69,12 @@
                 <textarea id="bio" class="input-control" rows="4" placeholder="Tell customers about your experience, approach, and why they should hire you..." required></textarea>
             </div>
 
+            <div class="form-group" style="margin-bottom: 2rem;">
+                <label class="form-label" for="upiId">Escrow Payout UPI ID (to receive money in your bank via Escrow)</label>
+                <input type="text" id="upiId" class="input-control" placeholder="e.g. yourname@okhdfcbank, 9876543210@paytm">
+                <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.35rem;">When customer or admin releases escrow funds upon service completion, payment will be sent to this UPI ID / QR code.</p>
+            </div>
+
             <div class="grid grid-cols-1 md-grid-cols-2 gap-6" style="margin-bottom: 3rem;">
                 <div class="form-group">
                     <label class="form-label" for="availability">Availability</label>
@@ -127,6 +133,9 @@
             if (user.skills && user.skills.length > 0) document.getElementById('skills').value = user.skills.join(', ');
             if (user.bio) document.getElementById('bio').value = user.bio;
             if (user.availability) document.getElementById('availability').value = user.availability;
+
+            const savedUpi = localStorage.getItem('localHire_worker_upi') || user.upiId || user.licenseNumber || '';
+            if (savedUpi) document.getElementById('upiId').value = savedUpi;
             
             if (user.lat && user.lng) {
                 document.getElementById('lat').value = user.lat;
@@ -183,12 +192,18 @@
                     skills: document.getElementById('skills').value.split(',').map(s => s.trim()).filter(s => s),
                     bio: document.getElementById('bio').value,
                     availability: document.getElementById('availability').value,
+                    upiId: document.getElementById('upiId').value.trim(),
                     lat: parseFloat(latInput.value) || null,
                     lng: parseFloat(lngInput.value) || null,
                     rating: user.rating || 5.0,
                     reviewsCount: user.reviewsCount || 1,
                     location: (latInput.value && lngInput.value) ? 'Local GPS coordinates set' : 'Remote'
                 };
+
+                const enteredUpi = document.getElementById('upiId').value.trim();
+                if (enteredUpi) {
+                    localStorage.setItem('localHire_worker_upi', enteredUpi);
+                }
 
                 submitButton.disabled = true;
                 submitButton.textContent = 'Saving...';

@@ -58,6 +58,10 @@ const formatWorker = (user) => {
     ? 'Available Today'
     : 'Available Today';
 
+  const upiId = profile?.licenseNumber || `${(user.email || 'worker').split('@')[0]}@okhdfcbank`;
+  const upiUri = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(user.name || 'Worker')}&cu=INR`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
+
   return {
     id: user.id,
     _id: user.id,
@@ -77,6 +81,10 @@ const formatWorker = (user) => {
     experience: `${Number(profile?.experienceYears || 0)} years`,
     experienceYears: Number(profile?.experienceYears || 0),
     businessName: profile?.businessName || '',
+    upiId,
+    upiUri,
+    qrCodeUrl,
+    licenseNumber: profile?.licenseNumber || '',
     serviceRadiusKm: Number(profile?.serviceRadiusKm || 20),
     isVerified: profile?.verificationStatus === 'VERIFIED',
     verificationStatus: profile?.verificationStatus,
@@ -284,6 +292,12 @@ exports.updateProfile = async (req, res) => {
     if (experience !== undefined) {
       const match = String(experience).match(/\d+/);
       profileUpdate.experienceYears = match ? Number(match[0]) : 0;
+    }
+    if (req.body.upiId !== undefined) {
+      profileUpdate.licenseNumber = String(req.body.upiId).trim();
+    }
+    if (req.body.licenseNumber !== undefined) {
+      profileUpdate.licenseNumber = String(req.body.licenseNumber).trim();
     }
     if (lat !== undefined || lng !== undefined) {
       profileUpdate.latitude = lat === null || lat === '' || lat === undefined ? null : Number(lat);

@@ -1,0 +1,234 @@
+/* LocalHire In-App Calling Experience */
+.lh-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.95), rgba(3, 7, 18, 0.98));
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3rem 1.5rem 2.5rem 1.5rem;
+  color: #fff;
+  font-family: inherit;
+  animation: lhCallFadeIn 0.3s ease;
+}
+
+@keyframes lhCallFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.lh-call-top {
+  text-align: center;
+  width: 100%;
+}
+
+.lh-call-security {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.lh-call-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 400px;
+}
+
+.lh-avatar-pulse-container {
+  position: relative;
+  width: 130px;
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lh-pulse-ring {
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  border: 2px solid rgba(139, 92, 246, 0.5);
+  animation: lhPulseAnimation 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lh-pulse-ring:nth-child(2) {
+  inset: -30px;
+  animation-delay: 0.6s;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+@keyframes lhPulseAnimation {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+.lh-call-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #8b5cf6;
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.4);
+  position: relative;
+  z-index: 2;
+  background: #1e293b;
+}
+
+.lh-call-name {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  color: #f8fafc;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.lh-call-role-badge {
+  display: inline-block;
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  padding: 3px 12px;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.lh-call-status {
+  font-size: 1.1rem;
+  color: #38bdf8;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lh-call-timer {
+  font-size: 1.35rem;
+  font-family: monospace;
+  color: #4ade80;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* Controls */
+.lh-call-bottom {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.lh-call-tools {
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.lh-tool-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 1.2rem;
+}
+
+.lh-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateY(-2px);
+}
+
+.lh-tool-btn.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.lh-call-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  width: 100%;
+}
+
+.lh-end-call-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.45);
+  transition: all 0.2s ease;
+}
+
+.lh-end-call-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 12px 30px rgba(239, 68, 68, 0.6);
+}
+
+.lh-answer-call-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.45);
+  transition: all 0.2s ease;
+}
+
+.lh-answer-call-btn:hover {
+  transform: scale(1.08);
+}
+
+.lh-direct-cell-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 0.82rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.lh-direct-cell-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}

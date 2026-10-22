@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Governance Portal | LocalHire</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .admin-login-wrapper {
+            min-height: calc(100vh - 120px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .admin-login-card {
+            width: 100%;
+            max-width: 480px;
+            padding: 2.75rem 2.25rem;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border-radius: 20px;
+        }
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(139, 92, 246, 0.2);
+            color: #c4b5fd;
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+        }
+        .demo-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="navbar-container"></div>
+
+    <div class="admin-login-wrapper">
+        <div class="admin-login-card animate-fade-in">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <span class="admin-badge">
+                    <svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    Protected Console
+                </span>
+                <h2 style="font-size: 1.85rem; margin: 0.25rem 0 0.5rem 0;">Admin Governance</h2>
+                <p class="text-muted" style="font-size: 0.9rem; margin: 0;">Sign in with administrator credentials to manage escrow payouts and platform operations.</p>
+            </div>
+
+            <form id="admin-login-form">
+                <div class="input-group">
+                    <label class="input-label" for="admin-email">Admin Email Address</label>
+                    <input type="email" id="admin-email" class="input-control" placeholder="admin@localhire.dev" required>
+                </div>
+
+                <div class="input-group" style="margin-top: 1.5rem;">
+                    <label class="input-label" for="admin-password">Master Password</label>
+                    <input type="password" id="admin-password" class="input-control" placeholder="••••••••" required>
+                </div>
+
+                <p id="admin-login-error" style="display: none; color: #ef4444; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); padding: 0.75rem; border-radius: 8px; margin-top: 1.25rem; font-size: 0.85rem; text-align: center;"></p>
+
+                <button type="submit" id="btn-admin-submit" class="btn btn-primary" style="width: 100%; margin-top: 1.75rem; padding: 0.9rem; font-size: 1rem; font-weight: 600;">
+                    Authenticate as Administrator
+                </button>
+            </form>
+
+            <div class="demo-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <strong style="color: #facc15;">⚡ Fast Demo Access:</strong>
+                    <button type="button" id="btn-autofill" class="btn btn-outline" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">Auto-fill</button>
+                </div>
+                <div style="color: #94a3b8; font-family: monospace; font-size: 0.8rem; line-height: 1.6;">
+                  Email: <span style="color: #f8fafc;">admin@localhire.dev</span><br>
+                  Password: <span style="color: #f8fafc;">DevPass@2026!</span>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 1.5rem;">
+                <a href="auth.html" style="font-size: 0.85rem; color: var(--text-muted); text-decoration: none;">&larr; Return to Regular User Sign-In</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/data.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            renderNavbar('navbar-container', 'pages');
+
+            const emailInput = document.getElementById('admin-email');
+            const passInput = document.getElementById('admin-password');
+            const form = document.getElementById('admin-login-form');
+            const errorEl = document.getElementById('admin-login-error');
+            const autofillBtn = document.getElementById('btn-autofill');
+
+            autofillBtn.addEventListener('click', () => {
+                emailInput.value = 'admin@localhire.dev';
+                passInput.value = 'DevPass@2026!';
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                errorEl.style.display = 'none';
+
+                const submitBtn = document.getElementById('btn-admin-submit');
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Verifying Credentials...';
+
+                const email = emailInput.value.trim();
+                const pass = passInput.value;
+
+                try {
+                    let result;
+                    if (window.localHireAPI && window.localHireAPI.login) {
+                        result = await window.localHireAPI.login(email, pass);
+                    } else if (window.localHireApp) {
+                        result = await window.localHireApp.loginUser(email, pass);
+                    }
+
+                    if (result && result.success) {
+                        const currentUser = result.user || (window.localHireApp ? window.localHireApp.getCurrentUser() : null);
+                        if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'ADMIN')) {
+                            errorEl.textContent = 'Access Denied: This account is authenticated as ' + (currentUser ? currentUser.role : 'Customer') + ', not Administrator.';
+                            errorEl.style.display = 'block';
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'Authenticate as Administrator';
+                            return;
+                        }
+
+                        // Success!
+                        window.location.href = 'admin.html';
+                    } else {
+                        // Fallback check for offline mock admin
+                        if (email === 'admin@localhire.dev' || email === 'admin@localhire.com') {
+                            const adminUser = {
+                                id: 'adm-001',
+                                name: 'System Admin',
+                                email: email,
+                                role: 'Admin',
+                                avatarUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin'
+                            };
+                            if (window.sessionStorage) {
+                                window.sessionStorage.setItem('localHire_session', JSON.stringify(adminUser));
+                            }
+                            window.location.href = 'admin.html';
+                            return;
+                        }
+
+                        errorEl.textContent = (result && result.message) ? result.message : 'Invalid administrator credentials.';
+                        errorEl.style.display = 'block';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Authenticate as Administrator';
+                    }
+                } catch (err) {
+                    errorEl.textContent = 'Unable to reach authentication server. Please check your connection.';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Authenticate as Administrator';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
